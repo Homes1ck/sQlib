@@ -1,0 +1,6 @@
+/mlruns
+/Users
+/cn_data/origin
+/cn_data/factor
+*/__pycache__
+.DS_Store
