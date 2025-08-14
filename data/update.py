@@ -17,7 +17,9 @@ def updateD(instruments: Union[str, List], freq="daily"):
             instruments = pd.read_csv(f"instruments/{instruments}.txt", sep='\t', header=None)
             instruments.columns = ["品种代码", "纳入日期", "剔除日期"]
             instruments = instruments.set_index(['纳入日期', '剔除日期'])
+
             instruments = instruments.loc[instruments.index[-1]]["品种代码"].tolist()
+            #instruments = set(instruments["品种代码"].tolist())
             instruments = [i.lower() for i in instruments]
         else:
             raise ValueError("Unsupported input market for param `instrument`")
@@ -85,7 +87,10 @@ def updateF(instruments: Union[str, List]):
             instruments = pd.read_csv(f"instruments/{instruments}.txt", sep='\t', header=None)
             instruments.columns = ["品种代码", "纳入日期", "剔除日期"]
             instruments = instruments.set_index(['纳入日期', '剔除日期'])
+
             instruments = instruments.loc[instruments.index[-1]]["品种代码"].tolist()
+            #instruments = set(instruments["品种代码"].tolist())
+
             instruments = [i.lower() for i in instruments]
         else:
             raise ValueError("Unsupported input market for param `instrument`")
