@@ -15,22 +15,31 @@ class LGBModel():
         self.early_stopping_rounds = early_stopping_rounds
         self.num_boost_round = num_boost_round
         self.model = None
+        # 🔹 加一个缓存字典
+        self._cache = {}
+    
+    def update_params(self, **kwargs):
+        """只更新参数，不清空缓存"""
+        self.params.update(kwargs)
 
     def _prepare_data(self, dataset: Handler, reweighter=None) -> List[Tuple[lgb.Dataset, str]]:
-        """
-        The motivation of current version is to make validation optional
-        - train segment is necessary;
-        """
         ds_l = []
         assert "train" in dataset.segments
+
         for key in ["train", "valid"]:
             if key in dataset.segments:
-                df = dataset.prepare(key, col_set=["feature", "label"], data_key=Handler.DK_L)
-                if df.empty:
-                    raise ValueError("Empty data from dataset, please check your dataset config.")
+                cache_key = (id(dataset), key)  # 用 dataset 对象和分段名作为 key
+                if cache_key in self._cache:
+                    df = self._cache[cache_key]
+                else:
+                    df = dataset.prepare(key, col_set=["feature", "label"], data_key=Handler.DK_L)
+                    if df.empty:
+                        raise ValueError("Empty data from dataset, please check your dataset config.")
+                    self._cache[cache_key] = df  # 🔹 存缓存
+
                 x, y = df["feature"], df["label"]
 
-                # Lightgbm need 1D array as its label
+                # LightGBM need 1D array as its label
                 if y.values.ndim == 2 and y.values.shape[1] == 1:
                     y = np.squeeze(y.values)
                 else:
@@ -40,6 +49,7 @@ class LGBModel():
                     w = None
                 else:
                     raise ValueError("Unsupported reweighter type.")
+
                 ds_l.append((lgb.Dataset(x.values, label=y, weight=w), key))
         return ds_l
 
