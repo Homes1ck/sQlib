@@ -1,19 +1,18 @@
-from __future__ import annotations
-
-import os
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass(frozen=True)
 class Settings:
-    tushare_token: str | None
+    tushare_token: Optional[str]
     data_dir: Path
     request_sleep: float = 0.0
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls):
         token = _normalize_token(os.getenv("TUSHARE_TOKEN"))
         data_dir = Path(os.getenv("SQLIB_DATA_DIR", "sqlib_data")).expanduser().resolve()
         sleep_raw = os.getenv("SQLIB_REQUEST_SLEEP", "0")
@@ -30,7 +29,7 @@ class Settings:
         )
 
 
-def _normalize_token(value: str | None) -> str | None:
+def _normalize_token(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
     stripped = value.strip()

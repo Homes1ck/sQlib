@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import argparse
+from typing import List, Optional
 
 from sqlib.services.daily_sync import sync_daily
 
@@ -16,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -26,14 +25,12 @@ def main(argv: list[str] | None = None) -> int:
             start_date=args.start_date,
             end_date=args.end_date,
         )
-        if result.failures:
-            for ts_code, error in result.failures.items():
-                print(f"FAIL {ts_code}: {error}")
-            return 1
         for ts_code in result.successes:
             print(f"SYNCED {ts_code}")
         for ts_code in result.noops:
             print(f"NOOP {ts_code}")
-        return 0
+        for ts_code, error in result.failures.items():
+            print(f"FAIL {ts_code}: {error}")
+        return 1 if result.failures else 0
 
     parser.error(f"unsupported command: {args.command}")

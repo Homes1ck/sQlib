@@ -1,1 +1,3 @@
-__all__: list[str] = []
+from typing import List
+
+__all__: List[str] = []

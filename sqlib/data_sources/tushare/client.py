@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import importlib
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Optional, Protocol
 
 import pandas as pd
 
@@ -33,8 +31,8 @@ class TushareDailyClient:
     def fetch_daily(
         self,
         ts_code: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> pd.DataFrame:
         frame = self.pro_api.daily(
             ts_code=ts_code,
@@ -51,7 +49,7 @@ class TushareDailyClient:
         return ordered
 
     @staticmethod
-    def _normalize_date_arg(value: str | None) -> str | None:
+    def _normalize_date_arg(value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         return value.replace("-", "")

@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import time
 from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Union
 
 import pandas as pd
 
@@ -12,19 +11,19 @@ from sqlib.storage.parquet_daily import ParquetDailyStore
 
 @dataclass
 class SyncResult:
-    successes: list[str] = field(default_factory=list)
-    noops: list[str] = field(default_factory=list)
-    failures: dict[str, str] = field(default_factory=dict)
+    successes: List[str] = field(default_factory=list)
+    noops: List[str] = field(default_factory=list)
+    failures: Dict[str, str] = field(default_factory=dict)
 
 
 def sync_daily(
-    ts_codes: str | list[str],
+    ts_codes: Union[str, List[str]],
     *,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    settings: Settings | None = None,
-    client: TushareDailyClient | None = None,
-    store: ParquetDailyStore | None = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    settings: Optional[Settings] = None,
+    client: Optional[TushareDailyClient] = None,
+    store: Optional[ParquetDailyStore] = None,
 ) -> SyncResult:
     settings = settings or Settings.from_env()
     client = client or TushareDailyClient.from_settings(settings)
@@ -62,8 +61,8 @@ def sync_daily(
 
 
 def _resolve_start_date(
-    store: ParquetDailyStore, ts_code: str, requested_start: str | None
-) -> str | None:
+    store: ParquetDailyStore, ts_code: str, requested_start: Optional[str]
+) -> Optional[str]:
     normalized_request = _normalize_date(requested_start)
     if not store.exists(ts_code):
         return normalized_request
@@ -82,7 +81,7 @@ def _resolve_start_date(
     return (latest_trade_date + pd.Timedelta(days=1)).strftime("%Y%m%d")
 
 
-def _normalize_date(value: str | None) -> str | None:
+def _normalize_date(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
     return value.replace("-", "")
