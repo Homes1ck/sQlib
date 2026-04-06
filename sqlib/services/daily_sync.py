@@ -36,6 +36,8 @@ def sync_daily(
         try:
             fetched = client.fetch_daily(ts_code, start_date=effective_start, end_date=end_date)
         except Exception as exc:
+            if isinstance(exc, (AttributeError, TypeError)):
+                raise
             result.failures[ts_code] = str(exc)
             continue
 
