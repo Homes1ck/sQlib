@@ -2,5 +2,7 @@
 /Users
 /cn_data/origin
 /cn_data/factor
-*/__pycache__
+__pycache__/
 .DS_Store
+sqlib.local.json
+sqlib_data/
