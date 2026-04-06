@@ -1,14 +1,10 @@
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass
 from typing import Protocol
 
 import pandas as pd
-
-try:
-    import tushare as ts
-except ModuleNotFoundError:  # pragma: no cover - exercised only in environments without tushare
-    ts = None
 
 from sqlib.config import Settings
 
@@ -25,8 +21,12 @@ class TushareDailyClient:
     def from_settings(cls, settings: Settings) -> "TushareDailyClient":
         if not settings.tushare_token:
             raise ValueError("TUSHARE_TOKEN is required to create a live TushareDailyClient")
-        if ts is None:
-            raise ModuleNotFoundError("tushare is required to create a live TushareDailyClient")
+        try:
+            ts = importlib.import_module("tushare")
+        except ModuleNotFoundError as exc:
+            if exc.name != "tushare":
+                raise
+            raise ModuleNotFoundError("tushare is required to create a live TushareDailyClient") from exc
         ts.set_token(settings.tushare_token)
         return cls(pro_api=ts.pro_api())
 
@@ -43,9 +43,7 @@ class TushareDailyClient:
         )
 
         if frame.empty:
-            return pd.DataFrame(
-                columns=["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"]
-            )
+            return self._empty_daily_frame()
 
         ordered = frame.loc[:, ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"]].copy()
         ordered["trade_date"] = pd.to_datetime(ordered["trade_date"], format="%Y%m%d")
@@ -57,3 +55,18 @@ class TushareDailyClient:
         if value is None:
             return None
         return value.replace("-", "")
+
+    @staticmethod
+    def _empty_daily_frame() -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "ts_code": pd.Series(dtype="object"),
+                "trade_date": pd.Series(dtype="datetime64[ns]"),
+                "open": pd.Series(dtype="float64"),
+                "high": pd.Series(dtype="float64"),
+                "low": pd.Series(dtype="float64"),
+                "close": pd.Series(dtype="float64"),
+                "vol": pd.Series(dtype="float64"),
+                "amount": pd.Series(dtype="float64"),
+            }
+        )
