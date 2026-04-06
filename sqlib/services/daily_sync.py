@@ -33,25 +33,30 @@ def sync_daily(
 
     result = SyncResult()
     for ts_code in codes:
+        effective_start = _resolve_start_date(store, ts_code, start_date)
         try:
-            effective_start = _resolve_start_date(store, ts_code, start_date)
             fetched = client.fetch_daily(ts_code, start_date=effective_start, end_date=end_date)
-            if fetched.empty:
-                result.noops.append(ts_code)
-                continue
-
-            if store.exists(ts_code):
-                existing = store.read(ts_code)
-                merged = store.merge_frames(existing, fetched)
-            else:
-                merged = fetched.sort_values("trade_date").reset_index(drop=True)
-
-            store.write(ts_code, merged)
-            result.successes.append(ts_code)
-            if settings.request_sleep:
-                time.sleep(settings.request_sleep)
         except Exception as exc:
             result.failures[ts_code] = str(exc)
+            continue
+
+        if fetched.empty:
+            result.noops.append(ts_code)
+            continue
+
+        if store.exists(ts_code):
+            existing = store.read(ts_code)
+            merged = store.merge_frames(existing, fetched)
+            if merged.equals(existing):
+                result.noops.append(ts_code)
+                continue
+        else:
+            merged = fetched.sort_values("trade_date").reset_index(drop=True)
+
+        store.write(ts_code, merged)
+        result.successes.append(ts_code)
+        if settings.request_sleep:
+            time.sleep(settings.request_sleep)
 
     return result
 
@@ -63,19 +68,18 @@ def _resolve_start_date(
     if not store.exists(ts_code):
         return normalized_request
 
+    if normalized_request is not None:
+        return normalized_request
+
     existing = store.read(ts_code)
     if existing.empty:
-        return normalized_request
+        return None
 
     latest_trade_date = pd.to_datetime(existing["trade_date"]).max()
     if pd.isna(latest_trade_date):
-        return normalized_request
+        return None
 
-    derived = (latest_trade_date + pd.Timedelta(days=1)).strftime("%Y%m%d")
-    if normalized_request is None:
-        return derived
-
-    return max(derived, normalized_request)
+    return (latest_trade_date + pd.Timedelta(days=1)).strftime("%Y%m%d")
 
 
 def _normalize_date(value: str | None) -> str | None:

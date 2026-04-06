@@ -1,3 +1,4 @@
+import pytest
 import pandas as pd
 
 from sqlib.services.daily_sync import sync_daily
@@ -69,6 +70,33 @@ def test_sync_daily_uses_next_date_for_incremental_sync(temp_data_dir):
     assert result.successes == ["000001.SZ"]
 
 
+def test_sync_daily_honors_explicit_backfill_start_date(temp_data_dir):
+    store = ParquetDailyStore(base_dir=temp_data_dir)
+    store.write(
+        "000001.SZ",
+        pd.DataFrame(
+            [
+                {
+                    "ts_code": "000001.SZ",
+                    "trade_date": pd.Timestamp("2024-01-02"),
+                    "open": 10.0,
+                    "high": 11.0,
+                    "low": 9.0,
+                    "close": 10.5,
+                    "vol": 10.0,
+                    "amount": 100.0,
+                },
+            ]
+        ),
+    )
+    client = DummyClient()
+
+    result = sync_daily(["000001.SZ"], start_date="2024-01-01", store=store, client=client)
+
+    assert client.calls == [("000001.SZ", "20240101", None)]
+    assert result.successes == ["000001.SZ"]
+
+
 def test_sync_daily_treats_empty_frame_as_noop(temp_data_dir):
     store = ParquetDailyStore(base_dir=temp_data_dir)
     client = DummyClient(
@@ -90,6 +118,59 @@ def test_sync_daily_treats_empty_frame_as_noop(temp_data_dir):
 
     assert result.noops == ["000001.SZ"]
     assert result.successes == []
+
+
+def test_sync_daily_skips_write_when_merge_is_unchanged(temp_data_dir):
+    class TrackingStore(ParquetDailyStore):
+        def __init__(self, base_dir):
+            super().__init__(base_dir=base_dir)
+            self.write_count = 0
+
+        def write(self, ts_code, frame):
+            self.write_count += 1
+            return super().write(ts_code, frame)
+
+    store = TrackingStore(base_dir=temp_data_dir)
+    ParquetDailyStore.write(
+        store,
+        "000001.SZ",
+        pd.DataFrame(
+            [
+                {
+                    "ts_code": "000001.SZ",
+                    "trade_date": pd.Timestamp("2024-01-02"),
+                    "open": 10.0,
+                    "high": 11.0,
+                    "low": 9.0,
+                    "close": 10.5,
+                    "vol": 10.0,
+                    "amount": 100.0,
+                },
+            ]
+        ),
+    )
+    client = DummyClient(
+        frame=pd.DataFrame(
+            [
+                {
+                    "ts_code": "000001.SZ",
+                    "trade_date": pd.Timestamp("2024-01-02"),
+                    "open": 10.0,
+                    "high": 11.0,
+                    "low": 9.0,
+                    "close": 10.5,
+                    "vol": 10.0,
+                    "amount": 100.0,
+                },
+            ]
+        )
+    )
+
+    result = sync_daily(["000001.SZ"], store=store, client=client)
+
+    assert result.noops == ["000001.SZ"]
+    assert result.successes == []
+    assert store.write_count == 0
 
 
 def test_sync_daily_keeps_processing_after_one_failure(temp_data_dir):
@@ -118,3 +199,11 @@ def test_sync_daily_keeps_processing_after_one_failure(temp_data_dir):
 
     assert result.failures["000001.SZ"] == "boom"
     assert result.successes == ["000002.SZ"]
+
+
+def test_sync_daily_does_not_mask_malformed_fetch_results(temp_data_dir):
+    store = ParquetDailyStore(base_dir=temp_data_dir)
+    client = DummyClient(frame="not-a-dataframe")
+
+    with pytest.raises(AttributeError):
+        sync_daily(["000001.SZ"], store=store, client=client)
