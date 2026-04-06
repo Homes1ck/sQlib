@@ -1,6 +1,79 @@
+from datetime import date, datetime
+
 import pandas as pd
 
 from sqlib.storage.parquet_daily import ParquetDailyStore
+
+
+def test_merge_frames_normalizes_mixed_trade_date_representations(temp_data_dir):
+    store = ParquetDailyStore(base_dir=temp_data_dir)
+    old_frame = pd.DataFrame(
+        [
+            {
+                "ts_code": "000001.SZ",
+                "trade_date": "2024/01/02",
+                "open": 10.0,
+                "high": 11.0,
+                "low": 9.0,
+                "close": 10.5,
+                "vol": 10.0,
+                "amount": 100.0,
+            },
+            {
+                "ts_code": "000001.SZ",
+                "trade_date": date(2024, 1, 3),
+                "open": 10.5,
+                "high": 11.2,
+                "low": 10.1,
+                "close": 10.8,
+                "vol": 12.0,
+                "amount": 120.0,
+            },
+        ]
+    )
+    new_frame = pd.DataFrame(
+        [
+            {
+                "ts_code": "000001.SZ",
+                "trade_date": datetime(2024, 1, 3, 15, 30),
+                "open": 99.5,
+                "high": 101.2,
+                "low": 98.1,
+                "close": 100.8,
+                "vol": 120.0,
+                "amount": 1200.0,
+            },
+            {
+                "ts_code": "000001.SZ",
+                "trade_date": pd.Timestamp("2024-01-04 09:15:00"),
+                "open": 10.8,
+                "high": 11.3,
+                "low": 10.4,
+                "close": 11.0,
+                "vol": 15.0,
+                "amount": 130.0,
+            },
+        ]
+    )
+
+    merged = store.merge_frames(old_frame, new_frame)
+
+    assert merged["trade_date"].dt.strftime("%Y%m%d").tolist() == [
+        "20240102",
+        "20240103",
+        "20240104",
+    ]
+    overwritten = merged.loc[merged["trade_date"] == pd.Timestamp("2024-01-03")].iloc[0]
+    assert overwritten.to_dict() == {
+        "ts_code": "000001.SZ",
+        "trade_date": pd.Timestamp("2024-01-03"),
+        "open": 99.5,
+        "high": 101.2,
+        "low": 98.1,
+        "close": 100.8,
+        "vol": 120.0,
+        "amount": 1200.0,
+    }
 
 
 def test_merge_frames_deduplicates_and_sorts(temp_data_dir):
